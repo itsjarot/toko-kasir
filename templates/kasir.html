@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Kasir{% endblock %}
+{% block crumb %}Kasir{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <span class="eyebrow">PENJUALAN</span>
+    <h1>Kasir</h1>
+    <p class="page-description">Pilih produk, tinjau pesanan, lalu simpan transaksi.</p>
+  </div>
+  <span class="page-context"><span class="context-dot"></span>Terminal penjualan</span>
+</div>
+
+<div class="form-layout cashier-layout">
+  <section class="product-browser">
+    <div class="toolbar product-toolbar">
+      <div class="search"><input id="cari" class="form-control" type="search" placeholder="Cari nama produk…" aria-label="Cari produk"></div>
+      {% if produk %}<span class="results-count">{{ produk|length }} produk tersedia</span>{% endif %}
+    </div>
+    {% if produk %}
+    <div class="product-grid" id="grid">
+      {% for p in produk %}
+      <button type="button" class="product-card {{ 'sold-out' if p.stok <= 0 }}"
+              data-id="{{ p.id }}" data-nama="{{ p.nama }}" data-harga="{{ p.harga|int }}" data-stok="{{ p.stok }}" data-kategori="{{ p.kategori or 'Umum' }}"
+              aria-label="Tambah {{ p.nama }} ke keranjang" {{ 'disabled' if p.stok <= 0 }}>
+        <span class="product-thumb" aria-hidden="true">{{ p.nama[:1]|upper }}</span>
+        <span class="product-info">
+          <span class="product-category">{{ p.kategori or 'Umum' }}</span>
+          <span class="product-name">{{ p.nama }}</span>
+          <span class="product-price">{{ p.harga|rupiah }}</span>
+          <span class="stock-line {% if p.stok <= 0 %}stock-empty{% elif p.stok <= 5 %}stock-low{% endif %}">
+            {% if p.stok <= 0 %}Stok habis{% elif p.stok <= 5 %}Sisa {{ p.stok }}{% else %}Stok {{ p.stok }}{% endif %}
+          </span>
+        </span>
+      </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card empty-products">
+      <div class="empty-state">
+        <span class="empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8h16l-1 12H5L4 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg></span>
+        <strong>Belum ada produk untuk dijual</strong>
+        <p>Tambahkan katalog produk dan stok awal agar transaksi dapat dimulai.</p>
+        <a class="btn btn-primary" href="{{ url_for('produk') }}">Kelola produk</a>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  <aside class="card order-summary">
+    <div class="card-header order-header"><div><h2>Pesanan saat ini</h2><span class="panel-caption">Tinjau sebelum disimpan</span></div><span class="order-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h14v16l-2.5-1.6L14 20l-2-1.6L9.5 20 5 20V4Z"/><path d="M8 9h8M8 13h8"/></svg></span></div>
+    <div class="card-body">
+      <div id="keranjang" class="cart-content"><p class="cart-empty"><span class="cart-empty-mark" aria-hidden="true">＋</span><span>Keranjang masih kosong</span><small>Pilih produk untuk memulai pesanan.</small></p></div>
+      <div class="summary-total"><span>Total pesanan</span><strong id="total">Rp 0</strong></div>
+      <div class="form-group mt-16">
+        <label class="form-label" for="metode">Metode pembayaran</label>
+        <select id="metode" class="form-select">
+          <option value="tunai">Tunai</option>
+          <option value="qris">QRIS</option>
+          <option value="transfer">Transfer bank</option>
+        </select>
+        <p class="form-help">Metode pembayaran dicatat pada transaksi.</p>
+      </div>
+      <div class="form-group mt-16" id="boxTunai">
+        <label class="form-label" for="bayar">Uang diterima</label>
+        <input id="bayar" class="form-control" type="number" min="0" inputmode="numeric" placeholder="Masukkan nominal">
+        <p class="form-help change-line" id="kembalian">Kembalian: Rp 0</p>
+      </div>
+      <div id="pesan" class="mt-16" hidden></div>
+      <button id="btnBayar" class="btn btn-primary btn-block mt-16" disabled>Simpan transaksi</button>
+      <button id="btnKosong" class="btn btn-ghost btn-block btn-clear" type="button">Kosongkan pesanan</button>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const rp = n => "Rp " + Number(n).toLocaleString("id-ID");
+const cart = {};          // id -> {nama, harga, stok, qty}
+const $ = id => document.getElementById(id);
+
+document.querySelectorAll(".product-card").forEach(el => {
+  el.addEventListener("click", () => {
+    const { id, nama, harga, stok } = el.dataset;
+    const c = cart[id] || (cart[id] = { nama, harga: +harga, stok: +stok, qty: 0 });
+    if (c.qty < c.stok) c.qty++;
+    render();
+  });
+});
+
+$("cari").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll(".product-card").forEach(el => {
+    el.hidden = !el.dataset.nama.toLowerCase().includes(q);
+  });
+});
+
+function ubah(id, d) {
+  cart[id].qty += d;
+  if (cart[id].qty <= 0) delete cart[id];
+  else if (cart[id].qty > cart[id].stok) cart[id].qty = cart[id].stok;
+  render();
+}
+window.ubah = ubah;
+
+function total() { return Object.values(cart).reduce((s, c) => s + c.harga * c.qty, 0); }
+
+function render() {
+  const ids = Object.keys(cart);
+  $("keranjang").innerHTML = ids.length ? ids.map(id => {
+    const c = cart[id];
+    return `<div class="summary-item">
+      <div class="summary-row"><span>${c.nama}</span><span class="price">${rp(c.harga * c.qty)}</span></div>
+      <div class="quantity-control">
+        <button type="button" onclick="ubah('${id}',-1)" aria-label="Kurangi">−</button>
+        <input value="${c.qty}" readonly aria-label="Jumlah">
+        <button type="button" onclick="ubah('${id}',1)" aria-label="Tambah">+</button>
+      </div></div>`;
+  }).join("") : '<p class="cart-empty"><span class="cart-empty-mark">＋</span><span>Keranjang masih kosong</span><small>Pilih produk untuk memulai pesanan.</small></p>';
+  $("total").textContent = rp(total());
+  $("btnBayar").disabled = !ids.length;
+  hitungKembali();
+}
+
+function hitungKembali() {
+  const k = Math.max(0, (+$("bayar").value || 0) - total());
+  $("kembalian").textContent = "Kembalian: " + rp(k);
+}
+$("bayar").addEventListener("input", hitungKembali);
+$("metode").addEventListener("change", e => { $("boxTunai").hidden = e.target.value !== "tunai"; });
+$("btnKosong").addEventListener("click", () => { Object.keys(cart).forEach(k => delete cart[k]); render(); });
+
+function tampil(teks, jenis) {
+  const p = $("pesan");
+  p.hidden = false;
+  p.className = "alert alert-" + jenis + " mt-16";
+  p.textContent = teks;
+}
+
+$("btnBayar").addEventListener("click", async () => {
+  if ($("metode").value === "tunai" && (+$("bayar").value || 0) < total()) {
+    return tampil("Uang yang diterima kurang dari total.", "error");
+  }
+  $("btnBayar").disabled = true;
+  const items = Object.entries(cart).map(([id, c]) => ({ id, qty: c.qty }));
+  const res = await fetch("/api/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items, metode: $("metode").value })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    tampil("Transaksi tersimpan. Total " + rp(total()) + ".", "success");
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    tampil(data.error || "Transaksi gagal disimpan.", "error");
+    $("btnBayar").disabled = false;
+  }
+});
+</script>
+{% endblock %}

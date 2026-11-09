@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Riwayat transaksi{% endblock %}
+{% block crumb %}Riwayat transaksi{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <span class="eyebrow">AUDIT PENJUALAN</span>
+    <h1>Riwayat transaksi</h1>
+    <p class="page-description">Catatan transaksi terbaru yang tersimpan di ruang kerja toko.</p>
+  </div>
+  <a class="btn btn-secondary" href="{{ url_for('kasir') }}">Buat transaksi</a>
+</div>
+
+<section class="card history-card">
+  <div class="card-header">
+    <div><h2>Transaksi terbaru</h2><span class="panel-caption">Menampilkan maksimal 100 transaksi</span></div>
+    <span class="table-status">TERSIMPAN</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table history-table">
+      <thead><tr><th>Referensi</th><th>Waktu</th><th>Barang</th><th>Metode</th><th class="text-right">Total</th></tr></thead>
+      <tbody>
+      {% for t in transaksi %}
+        <tr>
+          <td><code class="transaction-ref">{{ t.id|string|replace('-', '')|upper|truncate(10, true, '') }}</code></td>
+          <td class="nowrap"><span class="history-date">{{ t.created_at|tgl }}</span></td>
+          <td class="history-items">{% for i in t.transaksi_item %}<span>{{ i.nama_produk }} <small>×{{ i.qty }}</small></span>{{ ', ' if not loop.last }}{% endfor %}</td>
+          <td><span class="badge badge-neutral">{{ t.metode_bayar|upper }}</span></td>
+          <td class="amount text-right">{{ t.total|rupiah }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5"><div class="empty-state table-empty"><span class="empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.2-5.7L3.5 8.5"/><path d="M3.5 4.5v4h4M12 7v5l3.2 2"/></svg></span><strong>Belum ada transaksi</strong><p>Transaksi yang selesai disimpan akan tercatat di sini.</p><a class="text-link" href="{{ url_for('kasir') }}">Mulai transaksi <span aria-hidden="true">→</span></a></div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

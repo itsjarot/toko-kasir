@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Ringkasan{% endblock %}
+{% block crumb %}Ringkasan{% endblock %}
+{% block content %}
+<div class="page-header dashboard-head">
+  <div>
+    <span class="eyebrow">CATATAN OPERASIONAL</span>
+    <h1>Ringkasan</h1>
+    <p class="page-description">Ritme penjualan dan aktivitas Kedai Senja.</p>
+  </div>
+  <div class="sun-art" aria-hidden="true"><svg viewBox="0 0 160 100" fill="none"><circle cx="96" cy="42" r="20" stroke="#a95d42" stroke-width="1.4"/><path d="M96 9v7M96 68v7M63 42h7M122 42h7M73 19l5 5M114 60l5 5M119 19l-5 5M78 60l-5 5" stroke="#a95d42" stroke-width="1.4" stroke-linecap="round"/><path d="M37 72h97M51 72a45 45 0 0 1 90 0M64 83h62M75 91h43" stroke="#a95d42" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+  <a class="btn btn-primary" href="{{ url_for('kasir') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    Transaksi baru
+  </a>
+</div>
+
+<div class="stats-grid">
+  <article class="card stat-card stat-card-strong">
+    <div class="stat-top"><span>Pendapatan hari ini</span><span class="stat-icon"><svg viewBox="0 0 24 24"><path d="M4 7.5h16v12H4zM4 10h16M8 15h3"/><path d="M7 4.5h10"/></svg></span></div>
+    <div class="stat-value">{{ pendapatan_hari|rupiah }}</div>
+    <div class="stat-note">{{ transaksi_hari }} transaksi tercatat hari ini</div>
+  </article>
+  <article class="card stat-card">
+    <div class="stat-top"><span>Pendapatan bulan ini</span><span class="stat-icon icon-sand"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="15" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 14h2M14 14h2"/></svg></span></div>
+    <div class="stat-value">{{ pendapatan_bulan|rupiah }}</div>
+    <div class="stat-note">{{ transaksi_bulan }} transaksi sejak awal bulan</div>
+  </article>
+  <article class="card stat-card">
+    <div class="stat-top"><span>Rata-rata transaksi</span><span class="stat-icon icon-blue"><svg viewBox="0 0 24 24"><path d="M6 3.5h12v17l-2.5-1.7-3.5 1.7-3.5-1.7L6 20.5v-17Z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span></div>
+    <div class="stat-value">{{ (pendapatan_bulan // transaksi_bulan if transaksi_bulan else 0)|rupiah }}</div>
+    <div class="stat-note">{% if transaksi_bulan %}Per transaksi bulan ini{% else %}Belum ada transaksi bulan ini{% endif %}</div>
+  </article>
+  <article class="card stat-card">
+    <div class="stat-top"><span>Rata-rata pendapatan harian</span><span class="stat-icon icon-violet"><svg viewBox="0 0 24 24"><path d="M4 19.5h16M6.5 16V11M12 16V5M17.5 16V8"/></svg></span></div>
+    <div class="stat-value">{{ ((grafik|sum(attribute='total')) // 7)|rupiah }}</div>
+    <div class="stat-note">Berdasarkan 7 hari kalender terakhir</div>
+  </article>
+</div>
+
+<div class="dashboard-grid">
+  <section class="card panel-card">
+    <div class="card-header">
+      <div><h2>Pergerakan pendapatan</h2><span class="panel-caption">7 hari kalender terakhir</span></div>
+      <span class="chart-legend">Pendapatan</span>
+    </div>
+    {% set total_tujuh_hari = grafik|sum(attribute='total') %}
+    {% if total_tujuh_hari %}
+    <div class="card-body chart-list">
+      {% for g in grafik %}
+      <div class="chart-row">
+        <span class="chart-date">{{ g.label }}</span>
+        <div class="progress-track"><div class="progress-fill income" style="--progress: {{ (g.total / maks * 100)|round|int }}%"></div></div>
+        <span class="chart-value">{{ g.total|rupiah }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="chart-empty">
+      <span class="empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19.5h16M6.5 16v-4M12 16V7M17.5 16v-7"/></svg></span>
+      <div><strong>Belum ada aktivitas penjualan</strong><p>Grafik akan terisi otomatis setelah transaksi pertama tersimpan.</p></div>
+      <a class="text-link" href="{{ url_for('kasir') }}">Buka kasir <span aria-hidden="true">→</span></a>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="card panel-card">
+    <div class="card-header">
+      <div><h2>Produk terlaris</h2><span class="panel-caption">Berdasarkan unit terjual</span></div>
+      <a class="text-link" href="{{ url_for('produk') }}">Lihat produk <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="card-body best-sellers">
+      {% for nama, qty in terlaris %}
+      <div class="seller-row"><span class="seller-rank">{{ '%02d'|format(loop.index) }}</span><span class="seller-name">{{ nama }}</span><span class="seller-qty">{{ qty }} <small>unit</small></span></div>
+      {% else %}
+      <div class="empty-state compact-empty"><span class="empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="M8 12h8"/></svg></span><strong>Belum ada data produk</strong><p>Produk terlaris muncul setelah penjualan pertama.</p></div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
